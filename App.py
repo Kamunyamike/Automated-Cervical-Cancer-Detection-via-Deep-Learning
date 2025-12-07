@@ -101,16 +101,17 @@ with tab1:
         for uploaded_file in uploaded_files:
             file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
             img = cv2.imdecode(file_bytes, 1)
-            st.image(img, caption="Uploaded Image", use_column_width=True)
-
+            st.image(img, caption="Uploaded Image", width=700)
             processed_img = preprocess_image(img)
-            preds = model.predict(processed_img, verbose=0)
-            pred_class = CLASS_LABELS[np.argmax(preds)]
-            confidence = np.max(preds) * 100
+                preds = model.predict(processed_img, verbose=0)
+                pred_idx = np.argmax(preds)
+                pred_class = CLASS_LABELS[pred_idx]
+                confidence_score = float(preds[0][pred_idx])        # ← Python float
+                confidence_percent = confidence_score * 100
 
             st.subheader(f"Prediction: **{pred_class}**")
-            st.progress(confidence / 100)
-            st.write(f"Confidence: **{confidence:.2f}%**")
+            st.progress(confidence_score)
+            st.write(f"Confidence: **{confidence_percent:.2f}%**")
 
             # Grad-CAM
             try:
@@ -156,3 +157,4 @@ with tab2:
         st.pyplot(fig)
     else:
         st.info("Confusion matrix (confusion_matrix.pkl) not found yet. Upload it to the release to show here.")
+
