@@ -103,11 +103,11 @@ with tab1:
             img = cv2.imdecode(file_bytes, 1)
             st.image(img, caption="Uploaded Image", width=700)
             processed_img = preprocess_image(img)
-                preds = model.predict(processed_img, verbose=0)
-                pred_idx = np.argmax(preds)
-                pred_class = CLASS_LABELS[pred_idx]
-                confidence_score = float(preds[0][pred_idx])        # ← Python float
-                confidence_percent = confidence_score * 100
+            preds = model.predict(processed_img, verbose=0)
+            pred_idx = np.argmax(preds)
+            pred_class = CLASS_LABELS[pred_idx]
+            confidence_score = float(preds[0][pred_idx])        # ← Python float
+            confidence_percent = confidence_score * 100
 
             st.subheader(f"Prediction: **{pred_class}**")
             st.progress(confidence_score)
@@ -157,4 +157,5 @@ with tab2:
         st.pyplot(fig)
     else:
         st.info("Confusion matrix (confusion_matrix.pkl) not found yet. Upload it to the release to show here.")
+
 
