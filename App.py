@@ -53,23 +53,46 @@ def preprocess_image(img):
     img = img / 255.0
     return np.expand_dims(img, axis=0)
 
-def grad_cam(model, img_array, layer_name="conv2d_15"):  #last conv layer = best for Grad-CAM:
-    grad_model = tf.keras.models.Model([model.inputs], [model.get_layer(layer_name).output, model.output])
-    with tf.GradientTape() as tape:
-        conv_outputs, predictions = grad_model(img_array)
-        loss = predictions[:, np.argmax(predictions[0])]
-    grads = tape.gradient(loss, conv_outputs)[0]
-    weights = tf.reduce_mean(grads, axis=(0, 1))
-    cam = np.dot(conv_outputs[0], weights.numpy())
-    cam = cv2.resize(cam, (64, 64))
-    cam = np.maximum(cam, 0)
-    heatmap = cam / cam.max() if cam.max() > 0 else cam
-    return heatmap
+def grad_cam(model, img_array, layer_name="conv2d_15"):
+    target_layer = None
+    for layer in model.layers:
+        if layer.name == layer_name:
+            target_layer = layer
+            break
+        if hasattr(layer, 'layers'):
+            for sub_layer in layer.layers:
+                if sub_layer.name == layer_name:
+                    target_layer = sub_layer
+                    break
+        if target_layer:
+            break
+    if target_layer is None:
+        raise ValueError(f"Layer {layer_name} not found")
 
-def overlay_gradcam(img, heatmap):
-    heatmap = cv2.applyColorMap(np.uint8(255 * heatmap), cv2.COLORMAP_JET)
-    overlay = cv2.addWeighted(cv2.resize(img, (64,64)), 0.6, heatmap, 0.4, 0)
-    return overlay
+    grad_model = tf.keras.models.Model(
+        inputs=model.inputs,
+        outputs=[target_layer.output, model.output]
+    )
+
+    with tf.GradientTape() as tape:
+        conv_outputs, predictions = grad_model(img_array, training=False)
+        class_idx = tf.argmax(predictions[0])
+        loss = predictions[:, class_idx]
+
+    grads = tape.gradient(loss, conv_outputs)
+    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+    conv_outputs = conv_outputs[0]
+    heatmap = conv_outputs @ pooled_grads[..., tf.newaxis]
+    heatmap = tf.squeeze(heatmap)
+    heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+    return heatmap.numpy()
+
+def overlay_gradcam(original_img, heatmap):
+    heatmap = cv2.resize(heatmap, (original_img.shape[1], original_img.shape[0]))
+    heatmap = np.uint8(255 * heatmap)
+    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    superimposed = cv2.addWeighted(original_img, 0.7, heatmap, 0.3, 0)
+    return superimposed
 
 # ========================================
 # Streamlit UI
@@ -118,13 +141,12 @@ with tab1:
                 heatmap = grad_cam(model, processed_img)
                 overlay = overlay_gradcam(img, heatmap)
                 st.markdown("**Grad-CAM Heatmap (regions the model focused on):**")
-                st.image(overlay, use_column_width=True)
+                st.image(overlay, width=400)
             except Exception as e:
-                st.warning(f"Grad-CAM not available: {e}")
+                st.warning(f"Grad-CAM temporarily unavailable: {e}")
 
-# -----------------------------
 # Tab 2: Dashboard
-# -----------------------------
+
 with tab2:
     st.subheader("Model Performance Dashboard")
 
@@ -157,6 +179,7 @@ with tab2:
         st.pyplot(fig)
     else:
         st.info("Confusion matrix (confusion_matrix.pkl) not found yet. Upload it to the release to show here.")
+
 
 
 
