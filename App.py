@@ -53,7 +53,7 @@ def preprocess_image(img):
     img = img / 255.0
     return np.expand_dims(img, axis=0)
 
-def grad_cam(model, img_array, layer_name="conv2d_7"):
+def grad_cam(model, img_array, layer_name="conv2d_15"):  #last conv layer = best for Grad-CAM:
     grad_model = tf.keras.models.Model([model.inputs], [model.get_layer(layer_name).output, model.output])
     with tf.GradientTape() as tape:
         conv_outputs, predictions = grad_model(img_array)
@@ -157,5 +157,6 @@ with tab2:
         st.pyplot(fig)
     else:
         st.info("Confusion matrix (confusion_matrix.pkl) not found yet. Upload it to the release to show here.")
+
 
 
